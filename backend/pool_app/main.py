@@ -20,6 +20,9 @@ Base.metadata.create_all(bind=engine)
 if 'save_percentage' not in {column['name'] for column in inspect(engine).get_columns('player_season_stats')}: 
     with engine.begin() as connection:
         connection.execute(text('ALTER TABLE player_season_stats ADD COLUMN save_percentage FLOAT'))
+if 'wins' not in {column['name'] for column in inspect(engine).get_columns('player_season_stats')}: 
+    with engine.begin() as connection:
+        connection.execute(text('ALTER TABLE player_season_stats ADD COLUMN wins INTEGER NOT NULL DEFAULT 0'))
 if 'password_hash' not in {column['name'] for column in inspect(engine).get_columns('poolers')}:
     with engine.begin() as connection:
         connection.execute(text('ALTER TABLE poolers ADD COLUMN password_hash VARCHAR'))
@@ -123,6 +126,14 @@ def _position_category(position):
     return 'attacker'
 
 
+def _pool_points(player, stat):
+    if stat is None:
+        return 0
+    if _position_category(player.position) == 'goalie':
+        return (stat.wins or 0) * 2 + (stat.assists or 0)
+    return (stat.goals or 0) * 2 + (stat.assists or 0)
+
+
 ROSTER_LIMITS = {'attacker': 6, 'defense': 4, 'goalie': 2}
 
 
@@ -206,6 +217,13 @@ async def import_previous_stats(file: UploadFile = File(...), db: Session = Depe
         raise HTTPException(status_code=400, detail='Le fichier doit être un export Excel NHL (.xlsx).')
     return import_active_stats_excel(db, await file.read(), season_label='2025-26', filename=file.filename)
 
+
+@app.post("/api/import-goalie-stats")
+async def import_goalie_stats(file: UploadFile = File(...), db: Session = Depends(get_db), admin: Pooler = Depends(get_current_admin)):
+    if not file.filename.lower().endswith(('.xlsx', '.xlsm')):
+        raise HTTPException(status_code=400, detail='Le fichier doit être un export Excel NHL contenant les données CSV.')
+    return import_active_stats_excel(db, await file.read(), season_label='2026-27', filename=file.filename)
+
 @app.get("/api/players")
 def get_players(db: Session = Depends(get_db), current_pooler: Pooler = Depends(get_current_pooler)):
     active_season = '2026-27'
@@ -221,7 +239,7 @@ def get_players(db: Session = Depends(get_db), current_pooler: Pooler = Depends(
     players = db.query(Player).all()
     players.sort(
         key=lambda player: (
-            previous_stats.get(player.id).points if previous_stats.get(player.id) else -1,
+            _pool_points(player, previous_stats.get(player.id)) if previous_stats.get(player.id) else -1,
             player.name.casefold(),
         ),
         reverse=True,
@@ -231,13 +249,14 @@ def get_players(db: Session = Depends(get_db), current_pooler: Pooler = Depends(
         'name': player.name,
         'team': player.team,
         'position': player.position,
-        'points': active_stats.get(player.id).points if active_stats.get(player.id) else 0,
+        'points': _pool_points(player, active_stats.get(player.id)),
         'goals': active_stats.get(player.id).goals if active_stats.get(player.id) else 0,
         'assists': active_stats.get(player.id).assists if active_stats.get(player.id) else 0,
         'is_drafted': player.is_drafted,
         'previous_season': previous_season,
         'previous_goals': previous_stats.get(player.id).goals if previous_stats.get(player.id) else None,
         'previous_assists': previous_stats.get(player.id).assists if previous_stats.get(player.id) else None,
+        'previous_wins': previous_stats.get(player.id).wins if previous_stats.get(player.id) else None,
         'previous_points': previous_stats.get(player.id).points if previous_stats.get(player.id) else None,
         'previous_save_percentage': previous_stats.get(player.id).save_percentage if previous_stats.get(player.id) else None,
     } for player in players]
@@ -258,10 +277,11 @@ def get_poolers(db: Session = Depends(get_db), current_pooler: Pooler = Depends(
             "name": pl.name,
             "team": pl.team,
             "position": pl.position,
-            "points": active_stats.get(pl.id).points if active_stats.get(pl.id) else 0,
+            "points": _pool_points(pl, active_stats.get(pl.id)),
             "goals": active_stats.get(pl.id).goals if active_stats.get(pl.id) else 0,
             "assists": active_stats.get(pl.id).assists if active_stats.get(pl.id) else 0,
             "games_played": active_stats.get(pl.id).games_played if active_stats.get(pl.id) else 0,
+            "wins": active_stats.get(pl.id).wins if active_stats.get(pl.id) else 0,
             "save_percentage": active_stats.get(pl.id).save_percentage if active_stats.get(pl.id) else None,
             "position": pl.position,
             "is_drafted": pl.is_drafted,
@@ -327,12 +347,16 @@ def delete_pooler(pooler_id: int, db: Session = Depends(get_db), admin: Pooler =
 @app.get("/api/standings")
 def get_standings(db: Session = Depends(get_db), current_pooler: Pooler = Depends(get_current_pooler)):
     poolers = db.query(Pooler).filter(Pooler.is_approved.is_(True)).all()
+    active_stats = {
+        stat.player_id: stat
+        for stat in db.query(PlayerSeasonStat).filter(PlayerSeasonStat.season == '2026-27').all()
+    }
     results = []
     for p in poolers:
-        total = sum(player.points for player in p.players)
+        total = sum(_pool_points(player, active_stats.get(player.id)) for player in p.players)
         results.append({
             "id": p.id, "name": p.name, "draft_order": p.draft_order, "total_points": total,
-            "players": [{"name": pl.name, "points": pl.points, "team": pl.team} for pl in p.players]
+            "players": [{"name": pl.name, "points": _pool_points(pl, active_stats.get(pl.id)), "team": pl.team} for pl in p.players]
         })
     return sorted(results, key=lambda x: x["total_points"], reverse=True)
 

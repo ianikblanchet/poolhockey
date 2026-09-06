@@ -189,7 +189,7 @@ function SeasonPage({ season, draftOrder, currentTurn, poolTeams, selectionMessa
                       <strong style={{ color: category === 'goalie' ? '#a5d6a7' : category === 'defense' ? '#ffcc80' : '#8ecae6' }}>{categoryLabel[category]} ({players.length})</strong>
                       {players.map(player => (
                         <div key={player.id} style={{ padding: '7px 0', borderBottom: '1px solid #333', fontSize: '13px' }}>
-                          {player.name} · {player.points || 0} pts · {player.goals || 0} B · {player.assists || 0} P · {player.games_played || 0} MJ
+                          {player.name} · {player.points || 0} pts · {player.goals || 0} B · {player.assists || 0} P{category === 'goalie' ? ` · ${player.wins || 0} V` : ''} · {player.games_played || 0} MJ
                           {category === 'goalie' && player.save_percentage != null ? ` · ${(player.save_percentage * 100).toFixed(1)}%` : ''}
                         </div>
                       ))}
@@ -236,8 +236,10 @@ function App() {
   const [selectionMessage, setSelectionMessage] = useState('');
   
   const ws = useRef(null);
-  const API_URL = "http://127.0.0.1:8000/api";
-  const WS_URL = "ws://127.0.0.1:8000/ws/draft";
+  const backendHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
+  const apiOrigin = import.meta.env.VITE_API_URL || `${window.location.protocol}//${backendHost}:8000`;
+  const API_URL = `${apiOrigin}/api`;
+  const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${backendHost}:8000/ws/draft`;
 
   useEffect(() => {
     if (!authToken) return undefined;
@@ -647,8 +649,8 @@ function App() {
             🎲 Ordre aléatoire
           </button>
           <label style={{ backgroundColor: '#00695c', color: '#fff', border: 'none', padding: '10px', borderRadius: '4px', cursor: 'pointer' }}>
-            📥 Importer Excel 26/27
-            <input type="file" accept=".xlsx,.xlsm" onChange={event => importStatsFile(event, 'import-active-stats', '2026-27')} style={{ display: 'none' }} />
+            📥 Importer Excel gardiens 25/26
+            <input type="file" accept=".xlsx,.xlsm" onChange={event => importStatsFile(event, 'import-goalie-stats', 'gardiens 2026-27')} style={{ display: 'none' }} />
           </label>
           <label style={{ backgroundColor: '#455a64', color: '#fff', border: 'none', padding: '10px', borderRadius: '4px', cursor: 'pointer' }}>
             📥 Importer Excel 25/26
@@ -775,14 +777,45 @@ function App() {
           </div>
           <div style={{ maxHeight: '400px', overflowY: 'auto', background: '#222', padding: '10px' }}>
             <table style={{ width: '100%', textAlign: 'left' }}>
-              <thead><tr><th style={{ textAlign: 'left' }}>Nom</th><th style={{ textAlign: 'left' }}>Équipe</th><th style={{ textAlign: 'center' }}>Buts 25/26</th><th style={{ textAlign: 'center' }}>Passes 25/26</th><th style={{ textAlign: 'center' }}>Points 25/26</th><th style={{ textAlign: 'center' }}>Sélection</th></tr></thead>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Nom</th>
+                  <th style={{ textAlign: 'left' }}>Équipe</th>
+                  {playerType === 'goalies' ? (
+                    <>
+                      <th style={{ textAlign: 'center' }}>Victoires 25/26</th>
+                      <th style={{ textAlign: 'center' }}>Efficacité 25/26</th>
+                      <th style={{ textAlign: 'center' }}>Passes 25/26</th>
+                      <th style={{ textAlign: 'center' }}>Buts 25/26</th>
+                    </>
+                  ) : (
+                    <>
+                      <th style={{ textAlign: 'center' }}>Buts 25/26</th>
+                      <th style={{ textAlign: 'center' }}>Passes 25/26</th>
+                      <th style={{ textAlign: 'center' }}>Points 25/26</th>
+                    </>
+                  )}
+                  <th style={{ textAlign: 'center' }}>Sélection</th>
+                </tr>
+              </thead>
               <tbody>
                 {visiblePlayers.map(p => (
                   <tr key={p.id} style={{ opacity: p.is_drafted ? 0.3 : 1 }}>
                     <td style={{ textAlign: 'left' }}>{p.name}</td><td style={{ textAlign: 'left' }}>{p.team}</td>
-                    <td style={{ textAlign: 'center' }}>{p.previous_goals ?? '-'}</td>
-                    <td style={{ textAlign: 'center' }}>{p.previous_assists ?? '-'}</td>
-                    <td style={{ textAlign: 'center' }}>{p.previous_points ?? '-'}</td>
+                    {playerType === 'goalies' ? (
+                      <>
+                        <td style={{ textAlign: 'center' }}>{p.previous_wins ?? '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{p.previous_save_percentage != null ? `${(p.previous_save_percentage * 100).toFixed(1)}%` : '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{p.previous_assists ?? '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{p.previous_goals ?? '-'}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{ textAlign: 'center' }}>{p.previous_goals ?? '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{p.previous_assists ?? '-'}</td>
+                        <td style={{ textAlign: 'center' }}>{p.previous_points ?? '-'}</td>
+                      </>
+                    )}
                     <td style={{ textAlign: 'center' }}><button disabled={p.is_drafted || !canSelectPlayer(p)} onClick={() => handleDraft(p.id)} style={{ backgroundColor: p.is_drafted || !canSelectPlayer(p) ? '#444' : '#2196f3', color: '#fff', border:'none', padding: '4px 8px', cursor: p.is_drafted || !canSelectPlayer(p) ? 'not-allowed' : 'pointer' }}>{p.is_drafted ? "Pris" : "Choisir"}</button></td>
                   </tr>
                 ))}

@@ -39,6 +39,7 @@ class PlayerSeasonStat(Base):
     team = Column(String, nullable=True)
     position = Column(String, nullable=True)
     games_played = Column(Integer, default=0)
+    wins = Column(Integer, default=0)
     goals = Column(Integer, default=0)
     assists = Column(Integer, default=0)
     points = Column(Integer, default=0)
