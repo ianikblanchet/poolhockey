@@ -384,6 +384,27 @@ def create_pool_season(payload: dict, db: Session = Depends(get_db), admin: Pool
     }
 
 
+@app.post("/api/seasons/{season_id}/order")
+def update_pool_season_order(season_id: int, payload: dict, db: Session = Depends(get_db), admin: Pooler = Depends(get_current_admin)):
+    season = db.query(PoolSeason).filter(PoolSeason.id == season_id).first()
+    if season is None:
+        raise HTTPException(status_code=404, detail="Saison introuvable.")
+
+    order = payload.get("order") if isinstance(payload, dict) else None
+    if not isinstance(order, list) or not order:
+        raise HTTPException(status_code=400, detail="L'ordre de sélection est invalide.")
+
+    season.draft_order = order
+    DRAFT_STATUS["current_turn_order"] = 1
+    db.commit()
+    return {
+        "id": season.id,
+        "name": season.name,
+        "status": season.status,
+        "draft_order": season.draft_order,
+    }
+
+
 @app.post("/api/seasons/{season_id}/reset")
 def reset_pool_season(season_id: int, db: Session = Depends(get_db), admin: Pooler = Depends(get_current_admin)):
     season = db.query(PoolSeason).filter(PoolSeason.id == season_id).first()

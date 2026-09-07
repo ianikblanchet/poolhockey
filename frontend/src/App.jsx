@@ -239,7 +239,12 @@ function App() {
   const backendHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
   const apiOrigin = import.meta.env.VITE_API_URL || `${window.location.protocol}//${backendHost}:8000`;
   const API_URL = `${apiOrigin}/api`;
-  const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${backendHost}:8000/ws/draft`;
+  const websocketOrigin = import.meta.env.VITE_WS_URL || apiOrigin;
+  const websocketUrl = new URL(websocketOrigin);
+  websocketUrl.protocol = websocketUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  websocketUrl.pathname = '/ws/draft';
+  websocketUrl.search = '';
+  const WS_URL = websocketUrl.toString();
 
   useEffect(() => {
     if (!authToken) return undefined;
@@ -553,7 +558,7 @@ function App() {
     }
   };
 
-  const launchRandomSelectionOrder = () => {
+  const launchRandomSelectionOrder = async () => {
     if (!standings.length && !myPoolerData) {
       alert('Inscris au moins une équipe avant de lancer le draft.');
       return;
@@ -564,6 +569,31 @@ function App() {
       : [{ id: myPoolerData.id, name: myPoolerData.name }];
 
     const nextOrder = createRandomDraftOrder(sourceTeams);
+
+    if (poolSeason?.id) {
+      try {
+        const res = await fetch(`${API_URL}/seasons/${poolSeason.id}/order`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: nextOrder }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || "Impossible de modifier l'ordre de sélection.");
+        }
+
+        setPoolSeason(prev => ({ ...prev, ...data, order: data.draft_order }));
+        setDraftOrder(data.draft_order);
+        setDraftStarted(true);
+        setCurrentTurn(data.draft_order[0]?.draft_position || 1);
+        setLogs(prev => [`🎲 Ordre de sélection relancé : ${data.draft_order.map(team => team.name).join(' → ')}`, ...prev]);
+        return;
+      } catch (error) {
+        alert(error.message || "Impossible de modifier l'ordre de sélection.");
+        return;
+      }
+    }
+
     setDraftOrder(nextOrder);
     setDraftStarted(true);
     setCurrentTurn(nextOrder[0]?.draft_position || 1);
