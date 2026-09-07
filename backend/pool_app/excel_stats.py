@@ -96,6 +96,10 @@ def import_active_stats_excel(db: Session, content: bytes, season_label=DEFAULT_
     found_header = False
 
     rows = _read_excel_rows(content)
+    stats_by_player_id = {
+        stat.player_id: stat
+        for stat in db.query(PlayerSeasonStat).filter(PlayerSeasonStat.season == season_key).all()
+    }
     header = rows[0] if rows else None
     if header and 'PTS' in header and 'P' not in header:
         header = ['P' if value == 'PTS' else value for value in header]
@@ -117,13 +121,11 @@ def import_active_stats_excel(db: Session, content: bytes, season_label=DEFAULT_
                 unmatched.append(str(row[columns['Player']]))
                 continue
 
-            stat = db.query(PlayerSeasonStat).filter(
-                PlayerSeasonStat.player_id == player.id,
-                PlayerSeasonStat.season == season_key,
-            ).first()
+            stat = stats_by_player_id.get(player.id)
             if stat is None:
                 stat = PlayerSeasonStat(player_id=player.id, season=season_key)
                 db.add(stat)
+                stats_by_player_id[player.id] = stat
                 created += 1
 
             stat.team = row[columns['Team']]
