@@ -53,7 +53,7 @@ app.add_middleware(
 )
 
 # Variable d'état globale pour suivre l'avancement du repêchage
-DRAFT_STATUS = {"current_turn_order": 1}
+DRAFT_STATUS = {"current_turn_order": 1, "direction": 1}
 AUTH_SCHEME = HTTPBearer(auto_error=False)
 AUTH_SECRET = os.environ.get('SECRET_KEY', 'change-me-in-production').encode()
 
@@ -341,6 +341,7 @@ def delete_pooler(pooler_id: int, db: Session = Depends(get_db), admin: Pooler =
         ]
         if not active_season.draft_order:
             DRAFT_STATUS["current_turn_order"] = 1
+            DRAFT_STATUS["direction"] = 1
         else:
             current_turn = DRAFT_STATUS["current_turn_order"]
             if removed_position is not None and removed_position < current_turn:
@@ -382,6 +383,7 @@ def create_pool_season(payload: dict, db: Session = Depends(get_db), admin: Pool
     db.commit()
     db.refresh(season)
     DRAFT_STATUS["current_turn_order"] = 1
+    DRAFT_STATUS["direction"] = 1
     return {
         "id": season.id,
         "name": season.name,
@@ -403,6 +405,7 @@ def update_pool_season_order(season_id: int, payload: dict, db: Session = Depend
 
     season.draft_order = order
     DRAFT_STATUS["current_turn_order"] = 1
+    DRAFT_STATUS["direction"] = 1
     db.commit()
     return {
         "id": season.id,
@@ -431,6 +434,7 @@ def reset_pool_season(season_id: int, db: Session = Depends(get_db), admin: Pool
 
     db.delete(season)
     DRAFT_STATUS["current_turn_order"] = 1
+    DRAFT_STATUS["direction"] = 1
     db.commit()
     return {
         "status": "success",
@@ -539,10 +543,23 @@ async def draft_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
                 pooler.players.append(player)
                 
                 total_draft_teams = len(draft_order) or db.query(Pooler).count()
-                DRAFT_STATUS["current_turn_order"] = (
-                    1 if DRAFT_STATUS["current_turn_order"] >= total_draft_teams
-                    else DRAFT_STATUS["current_turn_order"] + 1
-                )
+                current_turn = DRAFT_STATUS["current_turn_order"]
+                direction = DRAFT_STATUS["direction"]
+                if total_draft_teams <= 1:
+                    next_turn = 1
+                    next_direction = 1
+                elif direction == 1 and current_turn >= total_draft_teams:
+                    next_turn = current_turn
+                    next_direction = -1
+                elif direction == -1 and current_turn <= 1:
+                    next_turn = current_turn
+                    next_direction = 1
+                else:
+                    next_turn = current_turn + direction
+                    next_direction = direction
+
+                DRAFT_STATUS["current_turn_order"] = next_turn
+                DRAFT_STATUS["direction"] = next_direction
                 db.commit()
 
                 await manager.broadcast({
