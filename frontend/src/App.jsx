@@ -63,6 +63,27 @@ const createRandomDraftOrder = (teams) => {
   }));
 };
 
+function WelcomeOverlay({ memberName, onClose }) {
+  return (
+    <div className="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+      <div className="welcome-panel">
+        <button className="welcome-close" onClick={onClose} aria-label="Fermer">×</button>
+        <div className="welcome-mark" aria-hidden="true">🏒</div>
+        <p className="welcome-kicker">POOL DE HOCKEY BLANCHET / NOEL</p>
+        <h2 id="welcome-title">Bienvenue, {memberName || 'dans le pool'} !</h2>
+        <p className="welcome-intro">Voici l’essentiel pour profiter de la saison et préparer une équipe solide.</p>
+        <div className="welcome-rules">
+          <div><strong>6 · 4 · 2</strong><span>6 attaquants, 4 défenseurs et 2 gardiens.</span></div>
+          <div><strong>2 pts</strong><span>Un but vaut 2 points, une passe vaut 1 point.</span></div>
+          <div><strong>Gardiens</strong><span>Une victoire vaut 2 points et une passe vaut 1 point.</span></div>
+          <div><strong>Serpentin</strong><span>Le draft avance puis revient : 1 · 2 · 3 · 4 · 4 · 3 · 2 · 1.</span></div>
+        </div>
+        <button className="welcome-action" onClick={onClose}>C’est parti</button>
+      </div>
+    </div>
+  );
+}
+
 function AuthPage({ mode, setMode, name, setName, password, setPassword, onSubmit, error }) {
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#111', color: '#fff', fontFamily: 'sans-serif', padding: '24px', boxSizing: 'border-box' }}>
@@ -89,7 +110,7 @@ function AuthPage({ mode, setMode, name, setName, password, setPassword, onSubmi
   );
 }
 
-function SeasonPage({ season, draftOrder, currentTurn, poolTeams, selectionMessage, onBack, onReset, onLogout }) {
+function SeasonPage({ season, draftOrder, currentTurn, poolTeams, selectionMessage, onBack, onReset, onLogout, onWelcome }) {
   const currentTeam = draftOrder.find(team => team.draft_position === currentTurn);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const selectedTeam = poolTeams.find(team => String(team.id) === String(selectedTeamId));
@@ -120,6 +141,9 @@ function SeasonPage({ season, draftOrder, currentTurn, poolTeams, selectionMessa
           {onReset && <button onClick={onReset} style={{ marginLeft: '10px', backgroundColor: '#b71c1c', color: '#fff', border: 'none', padding: '10px 14px', borderRadius: '4px', cursor: 'pointer' }}>
             Réinitialiser la saison
           </button>}
+          <button onClick={onWelcome} style={{ marginLeft: '10px', backgroundColor: '#176b87', color: '#fff', border: 'none', padding: '10px 14px', borderRadius: '4px', cursor: 'pointer' }}>
+            Revoir les règles
+          </button>
           <button onClick={onLogout} style={{ marginLeft: '10px', backgroundColor: '#345', color: '#fff', border: 'none', padding: '10px 14px', borderRadius: '4px', cursor: 'pointer' }}>
             Se déconnecter
           </button>
@@ -234,6 +258,7 @@ function App() {
   const [poolTeams, setPoolTeams] = useState([]);
   const [pendingPoolers, setPendingPoolers] = useState([]);
   const [selectionMessage, setSelectionMessage] = useState('');
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
   
   const ws = useRef(null);
   const backendHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
@@ -259,6 +284,15 @@ function App() {
     connectWebSocket();
     return () => ws.current && ws.current.close();
   }, [authToken]);
+
+  useEffect(() => {
+    if (!authToken || !myPoolerData?.id) return;
+    const welcomeKey = `nhl-welcome-seen-${myPoolerData.id}`;
+    if (!localStorage.getItem(welcomeKey)) {
+      localStorage.setItem(welcomeKey, 'true');
+      setWelcomeVisible(true);
+    }
+  }, [authToken, myPoolerData?.id]);
 
   const authHeaders = () => ({ Authorization: `Bearer ${authToken}` });
 
@@ -612,28 +646,36 @@ function App() {
 
   if (poolSeason && (currentPage === 'season' || !myPoolerData?.is_admin)) {
     return (
-      <SeasonPage
-        season={poolSeason}
-        draftOrder={draftOrder}
-        currentTurn={currentTurn}
-        poolTeams={poolTeams}
-        selectionMessage={selectionMessage}
-        onBack={myPoolerData?.is_admin ? () => setCurrentPage('pool') : undefined}
-        onReset={myPoolerData?.is_admin ? resetPoolSeason : undefined}
-        onLogout={() => { localStorage.removeItem('nhl-auth-token'); setAuthToken(null); setMyPoolerData(null); }}
-      />
+      <>
+        <SeasonPage
+          season={poolSeason}
+          draftOrder={draftOrder}
+          currentTurn={currentTurn}
+          poolTeams={poolTeams}
+          selectionMessage={selectionMessage}
+          onBack={myPoolerData?.is_admin ? () => setCurrentPage('pool') : undefined}
+          onReset={myPoolerData?.is_admin ? resetPoolSeason : undefined}
+          onWelcome={() => setWelcomeVisible(true)}
+          onLogout={() => { localStorage.removeItem('nhl-auth-token'); setAuthToken(null); setMyPoolerData(null); }}
+        />
+        {welcomeVisible && <WelcomeOverlay memberName={myPoolerData?.name} onClose={() => setWelcomeVisible(false)} />}
+      </>
     );
   }
 
   if (!poolSeason && !myPoolerData?.is_admin) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#111', color: '#fff', fontFamily: 'sans-serif', padding: '24px', boxSizing: 'border-box' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2>Aucune saison active</h2>
-          <p style={{ color: '#aaa' }}>L’organisateur n’a pas encore ouvert la saison du pool.</p>
-          <button onClick={() => { localStorage.removeItem('nhl-auth-token'); setAuthToken(null); }} style={{ background: '#345', color: '#fff', border: 'none', padding: '10px 14px', cursor: 'pointer' }}>Se déconnecter</button>
+      <>
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#111', color: '#fff', fontFamily: 'sans-serif', padding: '24px', boxSizing: 'border-box' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h2>Aucune saison active</h2>
+            <p style={{ color: '#aaa' }}>L’organisateur n’a pas encore ouvert la saison du pool.</p>
+            <button onClick={() => { localStorage.removeItem('nhl-auth-token'); setAuthToken(null); }} style={{ background: '#345', color: '#fff', border: 'none', padding: '10px 14px', cursor: 'pointer' }}>Se déconnecter</button>
+            <button onClick={() => setWelcomeVisible(true)} style={{ marginTop: '10px', background: '#176b87', color: '#fff', border: 'none', padding: '10px 14px', cursor: 'pointer' }}>Revoir les règles</button>
+          </div>
         </div>
-      </div>
+        {welcomeVisible && <WelcomeOverlay memberName={myPoolerData?.name} onClose={() => setWelcomeVisible(false)} />}
+      </>
     );
   }
 
@@ -650,6 +692,9 @@ function App() {
               Saison active
             </button>
           )}
+          <button onClick={() => setWelcomeVisible(true)} style={{ backgroundColor: '#176b87', color: '#fff', border: 'none', padding: '10px', borderRadius: '4px', cursor: 'pointer' }}>
+            Revoir les règles
+          </button>
           <select
             value={selectedSeason}
             onChange={(e) => setSelectedSeason(e.target.value)}
@@ -694,6 +739,8 @@ function App() {
           {selectionMessage}
         </div>
       )}
+
+      {welcomeVisible && <WelcomeOverlay memberName={myPoolerData?.name} onClose={() => setWelcomeVisible(false)} />}
 
       {myPoolerData?.is_admin && pendingPoolers.length > 0 && (
         <div style={{ margin: '20px 0', backgroundColor: '#3b2f12', border: '1px solid #a67c00', padding: '15px', borderRadius: '6px' }}>

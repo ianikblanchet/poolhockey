@@ -41,3 +41,127 @@
 .read-the-docs {
   color: #888;
 }
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 15, 22, 0.82);
+  backdrop-filter: blur(8px);
+  animation: welcome-fade-in 220ms ease-out;
+}
+
+.welcome-panel {
+  position: relative;
+  width: min(100%, 620px);
+  max-height: min(720px, 90vh);
+  overflow-y: auto;
+  padding: 42px clamp(24px, 5vw, 52px) 34px;
+  border: 1px solid #3a8799;
+  border-radius: 14px;
+  color: #f4fbfc;
+  background: linear-gradient(145deg, #123747 0%, #10242f 58%, #1b3d3a 100%);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  animation: welcome-rise 360ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.welcome-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: 0;
+  color: #b6d9dc;
+  background: transparent;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.welcome-mark {
+  font-size: 42px;
+  animation: welcome-pulse 1.8s ease-in-out infinite;
+}
+
+.welcome-kicker {
+  margin: 10px 0 4px;
+  color: #83d2d0;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+
+.welcome-panel h2 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(28px, 5vw, 42px);
+}
+
+.welcome-intro {
+  margin: 12px 0 26px;
+  color: #c9e1e2;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.welcome-rules {
+  display: grid;
+  gap: 10px;
+}
+
+.welcome-rules div {
+  display: grid;
+  grid-template-columns: minmax(90px, 120px) 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid rgba(145, 207, 205, 0.22);
+  border-radius: 8px;
+  background: rgba(3, 16, 23, 0.32);
+}
+
+.welcome-rules strong {
+  color: #8de0d0;
+  font-size: 18px;
+}
+
+.welcome-rules span {
+  color: #d4e7e7;
+  line-height: 1.4;
+}
+
+.welcome-action {
+  width: 100%;
+  margin-top: 26px;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 7px;
+  color: #072028;
+  background: #8de0d0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes welcome-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes welcome-rise {
+  from { opacity: 0; transform: translateY(18px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes welcome-pulse {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  50% { transform: rotate(5deg) translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-overlay, .welcome-panel, .welcome-mark { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .welcome-rules div { grid-template-columns: 1fr; gap: 4px; }
+}
