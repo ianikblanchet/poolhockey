@@ -489,15 +489,22 @@ function App() {
     canSelectForCurrentTeam &&
     rosterCounts[getPositionCategory(player.position)] < rosterLimits[getPositionCategory(player.position)]
   );
-  const visiblePlayers = players.filter(player => {
-    const search = playerSearch.trim().toLowerCase();
-    const matchesSearch = !search || `${player.name} ${player.team}`.toLowerCase().includes(search);
-    const matchesType = playerType === 'all'
-      || (playerType === 'goalies' && getPositionCategory(player.position) === 'goalie')
-      || (playerType === 'defense' && getPositionCategory(player.position) === 'defense')
-      || (playerType === 'attackers' && getPositionCategory(player.position) === 'attacker');
-    return matchesSearch && matchesType;
-  });
+  const visiblePlayers = [...players]
+    .filter(player => {
+      const search = playerSearch.trim().toLowerCase();
+      const matchesSearch = !search || `${player.name} ${player.team}`.toLowerCase().includes(search);
+      const matchesType = playerType === 'all'
+        || (playerType === 'goalies' && getPositionCategory(player.position) === 'goalie')
+        || (playerType === 'defense' && getPositionCategory(player.position) === 'defense')
+        || (playerType === 'attackers' && getPositionCategory(player.position) === 'attacker');
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      const aPoints = Number(a.previous_points ?? -1);
+      const bPoints = Number(b.previous_points ?? -1);
+      if (bPoints !== aPoints) return bPoints - aPoints;
+      return String(a.name).localeCompare(String(b.name), 'fr', { sensitivity: 'base' });
+    });
 
   const importStatsFile = async (event, endpoint, label) => {
     const file = event.target.files?.[0];
