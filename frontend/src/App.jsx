@@ -66,6 +66,9 @@ const createRandomDraftOrder = (teams) => {
 function WelcomeOverlay({ memberName, onClose }) {
   return (
     <div className="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+      <div className="welcome-sparks" aria-hidden="true">
+        <span>✦</span><span>•</span><span>✧</span><span>•</span><span>✦</span><span>·</span>
+      </div>
       <div className="welcome-panel">
         <button className="welcome-close" onClick={onClose} aria-label="Fermer">×</button>
         <div className="welcome-mark" aria-hidden="true">🏒</div>
