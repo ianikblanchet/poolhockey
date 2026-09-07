@@ -37,9 +37,12 @@ if 'is_approved' not in {column['name'] for column in inspect(engine).get_column
 
 app = FastAPI(title="NHL Pool Realtime Engine")
 
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+allowed_origins = [frontend_url, 'http://127.0.0.1:5173']
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # À restreindre selon votre nom de domaine en production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
