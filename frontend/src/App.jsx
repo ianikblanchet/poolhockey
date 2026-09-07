@@ -489,6 +489,8 @@ function App() {
     canSelectForCurrentTeam &&
     rosterCounts[getPositionCategory(player.position)] < rosterLimits[getPositionCategory(player.position)]
   );
+  const getPoints25_26 = (player) => Number(player.previous_points ?? player.points ?? 0);
+
   const visiblePlayers = [...players]
     .filter(player => {
       const search = playerSearch.trim().toLowerCase();
@@ -500,8 +502,8 @@ function App() {
       return matchesSearch && matchesType;
     })
     .sort((a, b) => {
-      const aPoints = Number(a.previous_points ?? -1);
-      const bPoints = Number(b.previous_points ?? -1);
+      const aPoints = getPoints25_26(a);
+      const bPoints = getPoints25_26(b);
       if (bPoints !== aPoints) return bPoints - aPoints;
       return String(a.name).localeCompare(String(b.name), 'fr', { sensitivity: 'base' });
     });
